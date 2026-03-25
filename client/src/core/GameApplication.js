@@ -14,7 +14,7 @@ export class GameApplication {
     this.experimentManager = null;
     this.timelineManager = null;
     this.isInitialized = false;
-    this.playerIndex = 0; // 0 = red player, 1 = orange player
+    this.playerIndex = 0; // 0 = red player, 1 = purple player
     this.gameConfig = null; // Store game configuration from server
     this.useTimelineFlow = true; // Enable timeline flow by default
     this.currentRoomId = null; // Track active multiplayer room ID for export
@@ -367,7 +367,7 @@ export class GameApplication {
     console.log('📡 Timeline event handlers setup completed');
   }
 
-  saveExperimentData(data) {
+  async saveExperimentData(data) {
     // Save/export experiment data in legacy-compatible shape
     try {
       // Pull comprehensive trial data from GameStateManager (legacy: allTrialsData)
@@ -833,7 +833,7 @@ export class GameApplication {
       const myPlayerConfig = config.players.find(p => p.id === mySocketId);
       if (myPlayerConfig) {
         this.playerIndex = myPlayerConfig.playerIndex;
-        console.log(`I am player ${this.playerIndex + 1} (${this.playerIndex === 0 ? 'red' : 'orange'})`);
+        console.log(`I am player ${this.playerIndex + 1} (${this.playerIndex === 0 ? 'red' : 'purple'})`);
         // Mark host (playerIndex 0) for client-coordinated actions like new-goal broadcast
         try {
           window.__PLAYER_INDEX__ = this.playerIndex;

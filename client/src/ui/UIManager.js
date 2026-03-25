@@ -9,7 +9,7 @@ export class UIManager {
     this.currentScreen = null;
     this.gameCanvas = null;
     this.keyboardHandler = null;
-    this.playerIndex = 0; // 0 = red player, 1 = orange player
+    this.playerIndex = 0; // 0 = red player, 1 = purple player
     this.gameMode = 'human-ai'; // 'human-ai' or 'human-human'
     this.lastGameState = null;
     this.handleResize = null;
@@ -77,7 +77,7 @@ export class UIManager {
             <ul style="text-align: left; display: inline-block;">
               <li>Use arrow keys (↑ ↓ ← →) to move</li>
               <li>You are the red player ⚫</li>
-              <li>Your partner is the orange player ⚫</li>
+              <li>Your partner is the purple player ⚫</li>
               <li>Work together to reach the green goals ⚫</li>
             </ul>
           </div>
@@ -147,7 +147,7 @@ export class UIManager {
 
     // Determine player color based on playerIndex
     const playerColor = this.playerIndex === 0 ? CONFIG.visual.colors.player1 : CONFIG.visual.colors.player2;
-    const playerName = this.playerIndex === 0 ? 'Player 1 (Red)' : 'Player 2 (Orange)';
+    const playerName = this.playerIndex === 0 ? 'Player 1 (Red)' : 'Player 2 (Purple)';
 
     this.container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">

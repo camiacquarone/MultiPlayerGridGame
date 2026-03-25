@@ -58,7 +58,7 @@ export const CONFIG = {
         // Types: 'human' | 'gpt' | 'rl_individual' | 'rl_joint'
         // Legacy alias 'ai' is treated as 'rl_joint'
         type: 'gpt',
-        color: 'orange',
+          color: 'purple',
         description: 'Human, GPT, or RL partner'
       }
     },
@@ -67,16 +67,16 @@ export const CONFIG = {
     experiments: {
       // order: ['1P1G'],
       // order: ['1P2G'],
-      order: [ '2P3G'],
+      // order: [ '2P3G'],
       // order: ['1P2G','2P3G'],
       // order: ['2P2G', '2P3G'],
-      // order: ['1P1G', '1P2G', '2P2G', '2P3G'], // Full experiment order
+      order: ['1P1G', '1P2G', '2P2G', '2P3G'], // Full experiment order
 
       numTrials: {
         '1P1G': 1, // 3
-        '1P2G': 12, // 12
-        '2P2G': 8, // 8
-        '2P3G': 12, // 12
+        '1P2G': 1, // 12
+        '2P2G': 1, // 8
+        '2P3G': 1, // 12
       }
     },
 
@@ -137,10 +137,25 @@ export const CONFIG = {
       background: '#ffffff',
       grid: '#cccccc',
       player1: '#ff0000',
-      player2: '#ff8800',
+      player2: '#8000ff',
       goal: '#0066ff',
       obstacle: '#333333'
     }
+  },
+
+  // Text-to-Speech settings
+  tts: {
+    // Use OpenAI TTS API for more natural voices (requires OPENAI_API_KEY on server)
+    // Falls back to browser TTS if OpenAI is unavailable
+    useOpenAI: getEnvVar('VITE_USE_OPENAI_TTS', 'true') === 'true',
+    // OpenAI TTS voice options: 'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'
+    openAIVoice: getEnvVar('VITE_OPENAI_TTS_VOICE', 'nova'),
+    // Server endpoint for TTS (defaults to same origin)
+    ttsServerUrl: getEnvVar('VITE_TTS_SERVER_URL', defaultServerUrl),
+    // Use custom recorded audio files instead of TTS
+    useCustomAudio: getEnvVar('VITE_USE_CUSTOM_AUDIO', 'true') === 'true',
+    // Base path for custom audio files
+    customAudioPath: getEnvVar('VITE_CUSTOM_AUDIO_PATH', '/audio/questionnaire/')
   },
 
   // 1P2G specific configuration

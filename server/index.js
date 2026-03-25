@@ -200,6 +200,60 @@ app.post('/api/ai/gpt/action', async (req, res) => {
   }
 });
 
+// OpenAI Text-to-Speech endpoint
+app.post('/api/tts/speak', async (req, res) => {
+  try {
+    const { text, voice = 'nova' } = req.body || {};
+
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Text is required' });
+    }
+
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return res.status(503).json({ error: 'OpenAI API key not configured' });
+    }
+
+    // Valid OpenAI TTS voices
+    const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+    const selectedVoice = validVoices.includes(voice) ? voice : 'nova';
+
+    // Call OpenAI TTS API
+    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'tts-1',
+        input: text,
+        voice: selectedVoice
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI TTS API error:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: 'OpenAI TTS API error', 
+        detail: errorText 
+      });
+    }
+
+    // Get audio data as buffer
+    const audioBuffer = await response.arrayBuffer();
+    
+    // Return audio as base64 or binary
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', audioBuffer.byteLength);
+    res.send(Buffer.from(audioBuffer));
+  } catch (err) {
+    console.error('TTS error:', err);
+    res.status(500).json({ error: 'Failed to generate speech', detail: String(err?.message || err) });
+  }
+});
+
 // Serve client static files (single-service deployment)
 // In production, serve built files from dist; in dev, serve from client
 const clientDir = fs.existsSync(path.join(__dirname, '..', 'dist'))
