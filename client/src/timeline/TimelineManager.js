@@ -16,7 +16,7 @@ export class TimelineManager {
     this.experimentData = {
       participantId: this.getParticipantId(),
       startTime: new Date().toISOString(),
-      consentTime: null,
+      // consentTime: null,
       experiments: {},
       questionnaire: {},
       totalScore: 0,
@@ -77,7 +77,7 @@ export class TimelineManager {
   setPlayerInfo(playerIndex, gameMode) {
     this.playerIndex = playerIndex;
     this.gameMode = gameMode;
-    console.log(`🎮 TimelineManager: Set player info - Player ${playerIndex + 1} (${playerIndex === 0 ? 'red' : 'orange'}) in ${gameMode} mode`);
+    console.log(`🎮 TimelineManager: Set player info - Player ${playerIndex + 1} (${playerIndex === 0 ? 'red' : 'purple'}) in ${gameMode} mode`);
   }
 
   /**
@@ -88,10 +88,16 @@ export class TimelineManager {
 
     console.log('📋 Creating comprehensive timeline stages...');
 
-    // 1. Consent form
+    // 1. Consent form (COMMENTED OUT)
+    // this.stages.push({
+    //   type: 'consent',
+    //   handler: () => this.showConsentStage()
+    // });
+
+    // 1. Start page
     this.stages.push({
-      type: 'consent',
-      handler: () => this.showConsentStage()
+      type: 'start',
+      handler: () => this.showStartStage()
     });
 
     // 2. Welcome info
@@ -115,6 +121,17 @@ export class TimelineManager {
         experimentIndex: expIndex,
         handler: () => this.showInstructionsStage(experimentType, expIndex)
       });
+
+      // For Game 3 (2P2G), insert a comprehension check right after the instructions
+      // before any multiplayer waiting/match-play or trials begin.
+      if (experimentType === '2P2G') {
+        this.stages.push({
+          type: 'comprehension_check',
+          experimentType: experimentType,
+          experimentIndex: expIndex,
+          handler: () => this.showComprehensionCheckStage(experimentType, expIndex)
+        });
+      }
 
       // Waiting room only for true human-human multiplayer experiments
       // For human-AI mode, 2P experiments run with AI as the second player
@@ -174,10 +191,10 @@ export class TimelineManager {
     }
 
     // 7. Game performance feedback
-    this.stages.push({
-      type: 'game-feedback',
-      handler: () => this.showGameFeedbackStage()
-    });
+    // this.stages.push({
+    //   type: 'game-feedback',
+    //   handler: () => this.showGameFeedbackStage()
+    // });
 
     // 8. Post-questionnaire
     this.stages.push({
@@ -364,28 +381,53 @@ export class TimelineManager {
     });
   }
 
+  showStartStage() {
+    this.container.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
+        <div style="text-align: center;">
+          <button id="startBtn" style="background: #28a745; color: white; border: none; padding: 20px 60px; font-size: 24px; font-weight: bold; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: background 0.3s;">
+            Start
+          </button>
+        </div>
+      </div>
+    `;
+
+    const startBtn = document.getElementById('startBtn');
+    
+    startBtn.addEventListener('mouseenter', () => {
+      startBtn.style.background = '#218838';
+    });
+    
+    startBtn.addEventListener('mouseleave', () => {
+      startBtn.style.background = '#28a745';
+    });
+
+    startBtn.addEventListener('click', () => {
+      this.nextStage();
+    });
+  }
+
   showWelcomeInfoStage() {
     this.container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
         <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; text-align: center;">
           <h2 style="color: #333; margin-bottom: 30px; font-size: 36px;">Welcome to the Game!</h2>
-
-          <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
-            <div style="text-align: center; line-height: 1.6; margin-bottom: 30px; font-size: 22px; max-width: 600px;">
-              <p style="margin-bottom: 10px;">
-                You will play a navigation game where hungry travelers need to reach restaurants as quickly as possible.
-              </p>
-              <p style="margin-bottom: 20px;">
-                <span style="color: #007bff; font-weight: bold;">
-                  Your goal: Use the arrow keys to guide your traveler to a restaurant.
-                </span>
-              </p>
-              <p style="margin-bottom: 20px;">
-                Next, let's see how to play the game!
-              </p>
-            </div>
+          
+          <div style="margin: 20px 0; text-align: center;">
+            <video 
+              id="welcomeVideo"
+              width="100%" 
+              height="400" 
+              controls
+              autoPlay
+              muted
+              playsInline
+              style="max-width: 600px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <source src="${this.assetUrl('video1.mp4')}" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
           </div>
-
+  
           <div style="margin-top: 30px;">
             <p style="font-size: 22px; font-weight: bold; color: #333; margin-bottom: 20px;">
               Press the <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-family: monospace;">spacebar</span> to continue!
@@ -395,17 +437,39 @@ export class TimelineManager {
       </div>
     `;
 
+    // Turn sound on with the very first user interaction (click/tap or key press)
+    const welcomeVideo = document.getElementById('welcomeVideo');
+    const enableSoundOnFirstInteraction = () => {
+      if (!welcomeVideo) return;
+      welcomeVideo.muted = false;
+      welcomeVideo.volume = 1;
+      welcomeVideo.play().catch((err) => {
+        console.warn('Unable to start video with sound:', err);
+      });
+      document.removeEventListener('click', enableSoundOnFirstInteraction);
+      document.removeEventListener('keydown', enableSoundOnFirstInteraction);
+      welcomeVideo.removeEventListener('click', enableSoundOnFirstInteraction);
+    };
+    document.addEventListener('click', enableSoundOnFirstInteraction, { once: true });
+    document.addEventListener('keydown', enableSoundOnFirstInteraction, { once: true });
+    if (welcomeVideo) {
+      welcomeVideo.addEventListener('click', enableSoundOnFirstInteraction, { once: true });
+    }
+
     // Handle spacebar to continue (matching legacy)
     const handleSpacebar = (event) => {
       if (event.code === 'Space' || event.key === ' ') {
+        // Use capture + preventDefault so space doesn't play/pause the video
         event.preventDefault();
-        document.removeEventListener('keydown', handleSpacebar);
+        event.stopPropagation();
+        document.removeEventListener('keydown', handleSpacebar, true);
         console.log('🎮 Starting game sequence');
         this.nextStage();
       }
     };
 
-    document.addEventListener('keydown', handleSpacebar);
+    // Capture phase ensures we intercept before focused elements (like <video>) handle spacebar.
+    document.addEventListener('keydown', handleSpacebar, true);
     document.body.focus();
   }
 
@@ -414,18 +478,228 @@ export class TimelineManager {
 
     this.container.innerHTML = instructions.html;
 
+    // For Game 1, Game 2, Game 3 and Game 4 instruction videos:
+    // - First try to autoplay WITH sound (by this point the child has already interacted with the page)
+    // - If the browser blocks that, fall back to muted autoplay and enable sound on first interaction
+    if (experimentType === '1P1G' || experimentType === '1P2G' || experimentType === '2P2G' || experimentType === '2P3G') {
+      const instructionVideo =
+        document.getElementById('game1Video') ||
+        document.getElementById('game2Video') ||
+        document.getElementById('game3Video') ||
+        document.getElementById('game4Video') ||
+        this.container.querySelector('video');
+
+      if (instructionVideo) {
+        instructionVideo.autoplay = true;
+        instructionVideo.playsInline = true;
+
+        const tryPlayWithSound = () => {
+          instructionVideo.muted = false;
+          instructionVideo.volume = 1;
+          return instructionVideo.play();
+        };
+
+        tryPlayWithSound().catch((err) => {
+          console.warn('Unable to autoplay instruction video with sound, falling back to muted:', err);
+
+          // Fallback: muted autoplay + enable sound on first interaction
+          instructionVideo.muted = true;
+          instructionVideo.play().catch((err2) => {
+            console.warn('Unable to autoplay muted instruction video:', err2);
+          });
+
+          const enableSoundOnFirstInteraction = () => {
+            instructionVideo.muted = false;
+            instructionVideo.volume = 1;
+            instructionVideo.play().catch((err3) => {
+              console.warn('Unable to start instruction video with sound after interaction:', err3);
+            });
+            document.removeEventListener('click', enableSoundOnFirstInteraction);
+            document.removeEventListener('keydown', enableSoundOnFirstInteraction);
+            instructionVideo.removeEventListener('click', enableSoundOnFirstInteraction);
+          };
+
+          document.addEventListener('click', enableSoundOnFirstInteraction, { once: true });
+          document.addEventListener('keydown', enableSoundOnFirstInteraction, { once: true });
+          instructionVideo.addEventListener('click', enableSoundOnFirstInteraction, { once: true });
+        });
+      }
+    }
+
     // Handle spacebar to continue (matching legacy)
     const handleSpacebar = (event) => {
       if (event.code === 'Space' || event.key === ' ') {
+        // Use capture + preventDefault so space doesn't play/pause any instruction videos
         event.preventDefault();
-        document.removeEventListener('keydown', handleSpacebar);
+        event.stopPropagation();
+        document.removeEventListener('keydown', handleSpacebar, true);
         console.log(`📋 Instructions completed for ${experimentType}`);
         this.nextStage();
       }
     };
 
-    document.addEventListener('keydown', handleSpacebar);
+    // Capture phase ensures we intercept before focused elements (like <video>) handle spacebar.
+    document.addEventListener('keydown', handleSpacebar, true);
     document.body.focus();
+  }
+
+  /**
+   * Comprehension check before Game 3 (2P2G):
+   * "Which dot are you? Press on your dot to continue."
+   *
+   * - Clicking the red dot (correct) continues into Game 3 as normal.
+   * - Clicking the purple dot skips remaining stages and jumps to the post-survey questionnaire.
+   */
+  showComprehensionCheckStage(experimentType, experimentIndex) {
+    const renderComprehensionCheck = (showError = false) => {
+      this.container.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
+          <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 700px; text-align: center;">
+            ${showError ? `
+              <h2 style="color:rgb(0, 0, 0); margin-bottom: 20px; font-size: 32px;">Remember you are the red dot, try again!</h2>
+            ` : `
+              <h2 style="color: #333; margin-bottom: 20px; font-size: 32px;">Which dot are you?</h2>
+              <p style="font-size: 20px; color: #555; margin-bottom: 30px;">
+                Press on your dot to continue.
+              </p>
+            `}
+
+            <div style="display: flex; justify-content: center; gap: 80px; margin-bottom: 30px;">
+              <button id="red-dot-btn" style="
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                border: 4px solid #cc0000;
+                background: #ff0000;
+                cursor: pointer;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+              ">
+              </button>
+
+              <button id="orange-dot-btn" style="
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                border: 4px solid #6600cc;
+                background: #8000ff;
+                cursor: pointer;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+              ">
+              </button>
+            </div>
+
+          </div>
+        </div>
+      `;
+
+      // --- Audio: read the question aloud when this page loads ---
+      // We first try to play your custom audio files.
+      // If the browser blocks autoplay or the file is missing, we fall back to browser TTS.
+      const questionText = showError
+        ? 'Remember you are the red dot. Try again.'
+        : 'Which dot are you? Press on your dot to continue.';
+      let currentAudio = null;
+
+      const stopQuestionAudio = () => {
+        try {
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+          }
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+          }
+        } catch (_) {
+          // ignore
+        }
+      };
+
+      const playQuestionWithTTS = () => {
+        try {
+          const synth = window.speechSynthesis;
+          if (!synth) return;
+
+          const utterance = new SpeechSynthesisUtterance(questionText);
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+          utterance.lang = 'en-US';
+
+          const voices = synth.getVoices();
+          const preferredVoice = voices.find(v =>
+            /en-US/i.test(v.lang) &&
+            (/natural|neural|premium|enhanced/i.test(v.name) ||
+             /samantha|alex|daniel|karen|moira|victoria/i.test(v.name))
+          ) || voices.find(v => /en-US/i.test(v.lang)) || voices[0];
+
+          if (preferredVoice) {
+            utterance.voice = preferredVoice;
+          }
+
+          synth.speak(utterance);
+        } catch (err) {
+          console.warn('Comprehension check TTS failed:', err);
+        }
+      };
+
+      const playQuestionAudio = () => {
+        if (showError) {
+          // For error message, use the Try again.mp3 audio file
+          try {
+            const audio = new Audio(this.assetUrl('try-again.mp3'));
+            currentAudio = audio;
+            audio.play().catch((err) => {
+              console.warn('Unable to autoplay Try again audio, falling back to TTS:', err);
+              playQuestionWithTTS();
+            });
+          } catch (err) {
+            console.warn('Error starting Try again audio, falling back to TTS:', err);
+            playQuestionWithTTS();
+          }
+        } else {
+          try {
+            // Use the dedicated comprehension-check audio file from /public
+            const audio = new Audio(this.assetUrl('comprehension-check.mp3'));
+            currentAudio = audio;
+            audio.play().catch((err) => {
+              console.warn('Unable to autoplay comprehension audio, falling back to TTS:', err);
+              playQuestionWithTTS();
+            });
+          } catch (err) {
+            console.warn('Error starting comprehension audio, falling back to TTS:', err);
+            playQuestionWithTTS();
+          }
+        }
+      };
+
+      // Try immediately – by this point the participant has usually interacted with the page already
+      playQuestionAudio();
+
+      const redBtn = document.getElementById('red-dot-btn');
+      const orangeBtn = document.getElementById('orange-dot-btn');
+
+      if (redBtn) {
+        redBtn.addEventListener('click', () => {
+          stopQuestionAudio();
+          // Correct answer – proceed to the next timeline stage (Game 3 waiting/match/trials)
+          console.log('✅ Comprehension check passed (red dot selected). Continuing to Game 3.');
+          this.nextStage();
+        });
+      }
+
+      if (orangeBtn) {
+        orangeBtn.addEventListener('click', () => {
+          stopQuestionAudio();
+          // Incorrect answer – show error message and re-render
+          console.log('⚠️ Comprehension check failed (purple dot selected). Showing error message.');
+          renderComprehensionCheck(true);
+        });
+      }
+    };
+
+    // Initial render
+    renderComprehensionCheck(false);
   }
 
   checkPartnerPresenceAndProceed(experimentType, experimentIndex) {
@@ -675,6 +949,18 @@ export class TimelineManager {
       <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
         <div style="max-width: 600px; margin: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 40px; text-align: center;">
           <h1 style="color: #28a745; margin-bottom: 30px;">✅ Game is Ready!</h1>
+          <div style="margin: 20px 0; text-align: center;">
+            <video
+              width="100%"
+              height="400"
+              controls
+              autoplay
+              playsinline
+              style="max-width: 600px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <source src="${this.assetUrl('video3.mp4')}" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
           <div style="font-size: 20px; color: #333; margin-bottom: 20px;">
             ${partnerMsgHtml}
             <p style="margin-top: 10px; font-size: 20px;">
@@ -692,7 +978,8 @@ export class TimelineManager {
     const handleSpacebar = (event) => {
       if (event.code === 'Space' || event.key === ' ') {
         event.preventDefault();
-        document.removeEventListener('keydown', handleSpacebar);
+        event.stopPropagation();
+        document.removeEventListener('keydown', handleSpacebar, true);
 
         // Signal match-play readiness
         this.emit('match-play-ready');
@@ -748,7 +1035,8 @@ export class TimelineManager {
         }
       }
     };
-    document.addEventListener('keydown', handleSpacebar);
+    // Capture phase so space doesn't play/pause the video element.
+    document.addEventListener('keydown', handleSpacebar, true);
     document.body.focus();
   }
 
@@ -1020,189 +1308,495 @@ export class TimelineManager {
   }
 
   showQuestionnaireStage() {
-    // Match legacy two-page questionnaire exactly
+    const startQuestionnaire = () => {
+      // Keyboard-first questionnaire (mouse/touch also supported for the first question)
+      const questions = [
+        {
+          name: 'ai_detection',
+          title: 'Page 1 of 3',
+          prompt: 'Do you think the other player is a person or a computer?',
+          options: [
+            'good',
+            'bad'
+          ]
+        },
+        {
+          name: 'collaboration_rating',
+          title: 'Page 2 of 3',
+          prompt: 'How well did the other player collaborate with you?',
+          options: [
+            'Very poor collaborator',
+            'Poor collaborator',
+            'Neutral',
+            'Good collaborator',
+            'Very good collaborator'
+          ]
+        },
+        {
+          name: 'play_again',
+          title: 'Page 3 of 3',
+          prompt: 'Would you like to play this game again in the future?',
+          options: [
+            'Definitely not play again',
+            'Probably not play again',
+            'Not sure',
+            'Probably play again',
+            'Definitely play again'
+          ]
+        }
+      ];
+
+      const answers = {};
+      let qIndex = 0;
+      // For the first question (ai_detection), we have 2 options (0/1).
+      // Default to index 0 so pressing Space before clicking is safe.
+      let selIndex = 0;
+
+      // Audio playback functionality with custom recordings support
+      let currentUtterance = null;
+      let currentAudio = null;
+      const synth = window.speechSynthesis || null;
+      const useCustomAudio = CONFIG?.tts?.useCustomAudio !== false;
+      const customAudioPath = CONFIG?.tts?.customAudioPath || '/audio/questionnaire/';
+      const useOpenAI = CONFIG?.tts?.useOpenAI !== false;
+      const ttsServerUrl = CONFIG?.tts?.ttsServerUrl || window.location.origin;
+      const openAIVoice = CONFIG?.tts?.openAIVoice || 'nova';
+
+      // Map questions and options to audio file paths
+      const getAudioFilePath = (questionIndex, text, isPrompt = false, optionIndex = -1) => {
+        const qNum = questionIndex + 1; // 1-indexed for file names
+
+        if (isPrompt) {
+          return this.assetUrl(`question${qNum}.mp3`);
+        }
+
+        if (text) {
+          return this.assetUrl(`${text}.mp3`);
+        }
+
+        const fileName = `q${qNum}_option${optionIndex}.mp3`;
+        return `${customAudioPath}${fileName}`;
+      };
+
+      // Play custom audio file
+      const playCustomAudio = async (audioPath) => {
+        return new Promise((resolve, reject) => {
+          const audio = new Audio(audioPath);
+          audio.onloadeddata = () => {
+            currentAudio = audio;
+            audio.play()
+              .then(() => {
+                audio.onended = () => {
+                  currentAudio = null;
+                  resolve();
+                };
+                audio.onerror = () => {
+                  currentAudio = null;
+                  reject(new Error('Audio playback failed'));
+                };
+              })
+              .catch(reject);
+          };
+
+          audio.onerror = () => {
+            reject(new Error('Audio file not found'));
+          };
+
+          audio.load();
+        });
+      };
+
+      const speakWithBrowserTTS = (text) => {
+        if (!synth) return Promise.resolve(); // Browser doesn't support TTS
+
+        return new Promise((resolve, reject) => {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+          utterance.lang = 'en-US';
+
+          // Try to use a natural-sounding voice
+          const voices = synth.getVoices();
+          const preferredVoice = voices.find(v =>
+            /en-US/i.test(v.lang) &&
+            (/natural|neural|premium|enhanced/i.test(v.name) ||
+              /samantha|alex|daniel|karen|moira|victoria/i.test(v.name))
+          ) || voices.find(v => /en-US/i.test(v.lang)) || voices[0];
+
+          if (preferredVoice) {
+            utterance.voice = preferredVoice;
+          }
+
+          currentUtterance = utterance;
+
+          utterance.onend = () => {
+            currentUtterance = null;
+            resolve();
+          };
+
+          utterance.onerror = (error) => {
+            currentUtterance = null;
+            reject(error);
+          };
+
+          synth.speak(utterance);
+        });
+      };
+
+      const speak = async (text, interrupt = true, isPrompt = false, optionIndex = -1) => {
+        if (!text) return Promise.resolve();
+
+        // Stop any ongoing speech
+        if (interrupt) {
+          if (currentUtterance && synth) {
+            synth.cancel();
+          }
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+          }
+        }
+
+        // Try custom audio first if enabled
+        if (useCustomAudio) {
+          const audioPath = getAudioFilePath(qIndex, text, isPrompt, optionIndex);
+
+          const pathsToTry = [];
+          if (!isPrompt && text) {
+            pathsToTry.push(this.assetUrl(`${text}.mp3`));
+            pathsToTry.push(this.assetUrl(`${text.charAt(0).toUpperCase() + text.slice(1)}.mp3`));
+            const qNum = qIndex + 1;
+            pathsToTry.push(`${customAudioPath}q${qNum}_option${optionIndex}.mp3`);
+          } else {
+            pathsToTry.push(audioPath);
+          }
+
+          for (const path of pathsToTry) {
+            try {
+              await playCustomAudio(path);
+              return Promise.resolve();
+            } catch (_) {
+              continue;
+            }
+          }
+
+          console.log(`Custom audio not found for any of: ${pathsToTry.join(', ')}, using TTS fallback`);
+        }
+
+        // Try OpenAI TTS if enabled
+        if (useOpenAI) {
+          try {
+            const response = await fetch(`${ttsServerUrl}/api/tts/speak`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: text,
+                voice: openAIVoice
+              })
+            });
+
+            if (response.ok) {
+              const audioBlob = await response.blob();
+              const audioUrl = URL.createObjectURL(audioBlob);
+              const audio = new Audio(audioUrl);
+
+              currentAudio = audio;
+
+              return new Promise((resolve, reject) => {
+                audio.onended = () => {
+                  URL.revokeObjectURL(audioUrl);
+                  currentAudio = null;
+                  resolve();
+                };
+
+                audio.onerror = () => {
+                  URL.revokeObjectURL(audioUrl);
+                  currentAudio = null;
+                  speakWithBrowserTTS(text).then(resolve).catch(reject);
+                };
+
+                audio.play().catch(reject);
+              });
+            }
+
+            console.warn('OpenAI TTS API error, falling back to browser TTS');
+            return speakWithBrowserTTS(text);
+          } catch (error) {
+            console.warn('OpenAI TTS failed, falling back to browser TTS:', error);
+            return speakWithBrowserTTS(text);
+          }
+        }
+
+        return speakWithBrowserTTS(text);
+      };
+
+      // Load voices if needed (some browsers need this)
+      if (synth && synth.getVoices().length === 0) {
+        synth.onvoiceschanged = () => {
+          // Voices loaded
+        };
+      }
+
+      const renderQuestion = (shouldSpeakPrompt = false) => {
+        const q = questions[qIndex];
+        const isImageQuestion = q.name === 'ai_detection';
+
+        let optionsHtml;
+        if (isImageQuestion) {
+          // Don't depend on /good.png and /bad.png being present.
+          // We render simple colored faces instead.
+          const faceColors = ['#22c55e', '#ef4444']; // good green, bad red
+          optionsHtml = q.options.map((opt, idx) => {
+            const isSelected = idx === selIndex;
+            const borderColor = isSelected ? '#4f46e5' : '#e5e7eb';
+            const bgColor = isSelected ? '#eef2ff' : '#ffffff';
+            const faceBg = faceColors[idx] || '#ef4444';
+            const faceChar = idx === 0 ? 'P' : 'C';
+            return `
+              <button class="image-option" data-idx="${idx}" style="
+                padding: 12px 16px;
+                margin: 8px 12px;
+                border-radius: 16px;
+                border: 3px solid ${borderColor};
+                background: ${bgColor};
+                cursor: pointer;
+                display: inline-flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+              ">
+                <div style="
+                  width:140px; height:140px;
+                  border-radius:50%;
+                  background:${faceBg};
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  font-size:64px;
+                  color:#ffffff;
+                  font-weight:800;
+                  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+                ">${faceChar}</div>
+              </button>`;
+          }).join('');
+        } else {
+          optionsHtml = q.options.map((opt, idx) => {
+            const isSelected = idx === selIndex;
+            return `
+              <div data-idx="${idx}" style="
+                padding: 12px 16px;
+                margin: 8px 0;
+                border-radius: 10px;
+                border: 2px solid ${isSelected ? '#4f46e5' : '#e5e7eb'};
+                background: ${isSelected ? '#eef2ff' : '#ffffff'};
+                color: #333;
+                font-size: 18px;
+                text-align: center;
+              ">${opt}</div>`;
+          }).join('');
+        }
+
+        this.container.innerHTML = `
+          <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#f8f9fa; padding:20px;">
+            <div style="background:white; padding:32px; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:100%; max-width:720px;">
+              <div style="text-align:center; margin-bottom:12px; color:#6b7280; font-weight:600;">📋 Post-Game Questionnaire</div>
+              <div style="text-align:center; margin-bottom:8px; color:#6b7280; font-weight:600;">${q.title}</div>
+              <h2 style="text-align:center; margin:8px 0 20px; color:#111827;">${q.prompt}</h2>
+              <div style="margin-bottom:16px; text-align:center; color:#6b7280;">
+                ${isImageQuestion
+                  ? 'Click a face to answer (or use ↑ ↓ and Space).'
+                  : 'Use ↑ ↓ to choose, press Space to confirm'}
+              </div>
+              <div id="options" style="display:flex; flex-direction:${isImageQuestion ? 'row' : 'column'}; justify-content:center;">${optionsHtml}</div>
+            </div>
+          </div>`;
+
+        const selectedOption = q.options[selIndex];
+        if (shouldSpeakPrompt) {
+          speak(q.prompt, true, true, -1).then(() => {
+            setTimeout(() => {
+              speak(selectedOption, false, false, selIndex);
+            }, 300);
+          }).catch(() => {
+            setTimeout(() => {
+              speak(selectedOption, false, false, selIndex);
+            }, 300);
+          });
+        } else {
+          speak(selectedOption, true, false, selIndex);
+        }
+
+        // Mouse/touch support for the first question
+        if (isImageQuestion) {
+          const buttons = this.container.querySelectorAll('.image-option');
+          buttons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const idx = Number(btn.getAttribute('data-idx') || '0');
+              selIndex = idx;
+              answers[q.name] = q.options[selIndex];
+
+              if (synth) synth.cancel();
+              if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
+              }
+
+              if (qIndex < questions.length - 1) {
+                qIndex += 1;
+                selIndex = 2;
+                renderQuestion(true);
+              } else {
+                document.removeEventListener('keydown', handleKeys);
+                this.experimentData.questionnaire = answers;
+                console.log('📝 Questionnaire completed');
+                this.nextStage();
+              }
+            });
+          });
+        }
+      };
+
+      const handleKeys = (e) => {
+        if (e.code === 'ArrowUp' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          selIndex = Math.max(0, selIndex - 1);
+          renderQuestion(false);
+        } else if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          selIndex = Math.min(questions[qIndex].options.length - 1, selIndex + 1);
+          renderQuestion(false);
+        } else if (e.code === 'Space' || e.key === ' ') {
+          e.preventDefault();
+
+          if (synth) synth.cancel();
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+          }
+
+          answers[questions[qIndex].name] = questions[qIndex].options[selIndex];
+
+          if (qIndex < questions.length - 1) {
+            qIndex += 1;
+            selIndex = 2;
+            renderQuestion(true);
+          } else {
+            document.removeEventListener('keydown', handleKeys);
+            if (synth) synth.cancel();
+            if (currentAudio) {
+              currentAudio.pause();
+              currentAudio.currentTime = 0;
+              currentAudio = null;
+            }
+            this.experimentData.questionnaire = answers;
+            console.log('📝 Questionnaire completed');
+            this.nextStage();
+          }
+        }
+      };
+
+      renderQuestion(true); // Initial render
+      document.addEventListener('keydown', handleKeys);
+
+      // Clean up speech when leaving the page
+      const cleanup = () => {
+        if (synth) synth.cancel();
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
+          currentAudio = null;
+        }
+        document.removeEventListener('keydown', handleKeys);
+      };
+
+      // Store cleanup function for potential future use
+      this._questionnaireCleanup = cleanup;
+    };
+
+    // Questionnaire instructions video BEFORE the questions
     this.container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
-        <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; width: 100%;">
-          <h2 style="color: #333; margin-bottom: 30px; text-align: center;">Post-Experiment Questionnaire</h2>
+        <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; text-align: center;">
+          <h2 style="color: #333; margin-bottom: 30px; font-size: 32px;">Questionnaire</h2>
 
-          <form id="questionnaireForm">
-            <div id="questionnairePage1">
-              <h3 style="color: #666; margin-bottom: 20px;">Page 1 of 2</h3>
+          <div style="margin: 20px 0; text-align: center;">
+            <video
+              id="questionnaireInstructionsVideo"
+              width="100%"
+              height="400"
+              controls
+              autoPlay
+              muted
+              playsInline
+              preload="auto"
+              style="max-width: 600px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <source src="${this.assetUrl('questionnaire-instructions.mp4')}" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
 
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  Do you think the other player is a person or an AI?
-                </label>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  ${[
-                    'Definitely a person',
-                    'Probably a person',
-                    'Not sure',
-                    'Probably an AI',
-                    'Definitely an AI'
-                  ].map(v => `
-                    <label style=\"display: flex; align-items: center; cursor: pointer;\">
-                      <input type=\"radio\" name=\"ai_detection\" value=\"${v}\" required style=\"margin-right: 10px;\">${v}
-                    </label>
-                  `).join('')}
-                </div>
-              </div>
-
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  To what extent do you think the other player was a good collaborator?
-                </label>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  ${[
-                    'Very poor collaborator',
-                    'Poor collaborator',
-                    'Neutral',
-                    'Good collaborator',
-                    'Very good collaborator'
-                  ].map(v => `
-                    <label style=\"display: flex; align-items: center; cursor: pointer;\">
-                      <input type=\"radio\" name=\"collaboration_rating\" value=\"${v}\" required style=\"margin-right: 10px;\">${v}
-                    </label>
-                  `).join('')}
-                </div>
-              </div>
-
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  What is the color of the "Next Page" button in this survey?
-                </label>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  ${[
-                    'Definitely blue',
-                    'Probably blue',
-                    'Not sure',
-                    'Probably red',
-                    'Definitely red'
-                  ].map(v => `
-                    <label style=\"display: flex; align-items: center; cursor: pointer;\">
-                      <input type=\"radio\" name=\"attention_check\" value=\"${v}\" required style=\"margin-right: 10px;\">${v}
-                    </label>
-                  `).join('')}
-                </div>
-              </div>
-
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  Would you play with the other player again?
-                </label>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                  ${[
-                    'Definitely not play again',
-                    'Probably not play again',
-                    'Not sure',
-                    'Probably play again',
-                    'Definitely play again'
-                  ].map(v => `
-                    <label style=\"display: flex; align-items: center; cursor: pointer;\">
-                      <input type=\"radio\" name=\"play_again\" value=\"${v}\" required style=\"margin-right: 10px;\">${v}
-                    </label>
-                  `).join('')}
-                </div>
-              </div>
-
-              <div style="text-align: center; margin-top: 30px;">
-                <button type="button" id="nextPageBtn" style="
-                  background: #007bff; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 5px; cursor: pointer;">Next Page</button>
-              </div>
-            </div>
-
-            <div id="questionnairePage2" style="display: none;">
-              <h3 style="color: #666; margin-bottom: 20px;">Page 2 of 2</h3>
-
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  Did you use any strategy in the game? If yes, what was it?
-                </label>
-                <textarea name="strategy" rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: inherit; resize: vertical;" placeholder="Please describe your strategy..."></textarea>
-              </div>
-
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  Some people have cats as their pets, true or false?
-                </label>
-                <textarea name="cat_question" rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: inherit; resize: vertical;" placeholder="Please answer true or false..."></textarea>
-              </div>
-
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  What do you think the purpose of this experiment is?
-                </label>
-                <textarea name="purpose" rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: inherit; resize: vertical;" placeholder="Please share your thoughts..."></textarea>
-              </div>
-
-              <div style="margin-bottom: 25px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 10px; color: #333;">
-                  Do you have any questions or comments?
-                </label>
-                <textarea name="comments" rows="4" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: inherit; resize: vertical;" placeholder="Any additional feedback..."></textarea>
-              </div>
-
-              <div style="text-align: center; margin-top: 30px;">
-                <button type="button" id="prevPageBtn" style="background: #6c757d; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 5px; cursor: pointer; margin-right: 10px;">Previous Page</button>
-                <button type="submit" id="submitBtn" style="background: #28a745; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 5px; cursor: pointer;">Submit</button>
-              </div>
-            </div>
-          </form>
+          <p style="font-size: 20px; color: #333; margin-top: 20px;">
+            When you are ready, press the <span style="background:#f0f0f0; padding:4px 8px; border-radius:4px; font-family:monospace;">spacebar</span> to start the questions.
+          </p>
         </div>
       </div>
     `;
 
-    // Navigation and validation like legacy
-    const nextBtn = document.getElementById('nextPageBtn');
-    const prevBtn = document.getElementById('prevPageBtn');
-    const page1 = document.getElementById('questionnairePage1');
-    const page2 = document.getElementById('questionnairePage2');
+    // Autoplay behavior: first try with sound, fall back to muted
+    const videoEl = document.getElementById('questionnaireInstructionsVideo');
+    if (videoEl) {
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
 
-    if (nextBtn) {
-      nextBtn.addEventListener('click', () => {
-        const required = ['ai_detection', 'collaboration_rating', 'attention_check', 'play_again'];
-        let valid = true;
-        required.forEach((name) => {
-          const el = document.querySelector(`input[name="${name}"]:checked`);
-          if (!el) {
-            valid = false;
-            const any = document.querySelector(`input[name="${name}"]`);
-            if (any) {
-              const group = any.closest('div').parentElement;
-              group.style.border = '2px solid #dc3545';
-              group.style.borderRadius = '5px';
-              group.style.padding = '10px';
-            }
-          }
+      const tryPlayWithSound = () => {
+        videoEl.muted = false;
+        videoEl.volume = 1;
+        return videoEl.play();
+      };
+
+      tryPlayWithSound().catch((err) => {
+        console.warn('Unable to autoplay questionnaire video with sound, falling back to muted:', err);
+
+        videoEl.muted = true;
+        videoEl.play().catch((err2) => {
+          console.warn('Unable to autoplay muted questionnaire video:', err2);
         });
-        if (valid) {
-          page1.style.display = 'none';
-          page2.style.display = 'block';
-        } else {
-          alert('Please answer all required questions before proceeding.');
-        }
+
+        const enableSoundOnFirstInteraction = () => {
+          try {
+            videoEl.muted = false;
+            videoEl.volume = 1;
+            videoEl.play().catch((err3) => {
+              console.warn('Unable to start questionnaire video with sound after interaction:', err3);
+            });
+          } catch (_) { /* noop */ }
+          document.removeEventListener('click', enableSoundOnFirstInteraction);
+          document.removeEventListener('keydown', enableSoundOnFirstInteraction);
+          videoEl.removeEventListener('click', enableSoundOnFirstInteraction);
+        };
+
+        document.addEventListener('click', enableSoundOnFirstInteraction, { once: true });
+        document.addEventListener('keydown', enableSoundOnFirstInteraction, { once: true });
+        videoEl.addEventListener('click', enableSoundOnFirstInteraction, { once: true });
       });
     }
 
-    if (prevBtn) {
-      prevBtn.addEventListener('click', () => {
-        page2.style.display = 'none';
-        page1.style.display = 'block';
-      });
-    }
-
-    document.getElementById('questionnaireForm').addEventListener('submit', (event) => {
-      event.preventDefault();
-      const formData = new FormData(event.target);
-      const answers = {};
-      for (const [k, v] of formData.entries()) {
-        answers[k] = v;
+    // Spacebar to start the questions
+    const handleSpaceToStart = (event) => {
+      if (event.code === 'Space' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        document.removeEventListener('keydown', handleSpaceToStart, true);
+        startQuestionnaire();
       }
-      this.experimentData.questionnaire = answers;
-      console.log('📝 Questionnaire completed');
-      this.nextStage();
-    });
+    };
+    document.addEventListener('keydown', handleSpaceToStart, true);
+    document.body.focus();
   }
 
   showEndExperimentInfoStage() {
@@ -1379,6 +1973,12 @@ export class TimelineManager {
     return mode === 'human-human';
   }
 
+  assetUrl(path) {
+    const base = (import.meta?.env?.BASE_URL) || '/';
+    const normalizedPath = String(path || '').replace(/^\/+/, '');
+    return `${base}${normalizedPath}`;
+  }
+
   getInstructionsForExperiment(experimentType) {
     const instructions = {
       '1P1G': {
@@ -1387,12 +1987,19 @@ export class TimelineManager {
             <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; text-align: center;">
               <h2 style="color: #333; margin-bottom: 30px; font-size: 36px;">Game 1</h2>
               <h3 style="color: #000; margin-bottom: 20px; font-size: 24px;">Before we begin, let's practice a few rounds!</h3>
-              <div style="background: #e8f5e8; border: 1px solid #c3e6cb; border-radius: 8px; padding: 28px; margin-bottom: 30px;">
-                <ul style="font-size: 22px; color: #155724; margin-bottom: 15px; line-height: 1.6; text-align: left; padding-left: 20px;">
-                  <li>You are the traveler <span style=\"display: inline-block; width: 20px; height: 20px; background-color: red; border-radius: 50%; vertical-align: middle; margin: 0 4px;\"></span>.</li>
-                  <li>There is one restaurant <span style=\"display: inline-block; width: 20px; height: 20px; background-color: #007bff; border-radius: 3px; vertical-align: middle; margin: 0 4px;\"></span> on the map.</li>
-                  <li>Use the arrow keys (↑↓←→) to reach a restaurant.</li>
-                </ul>
+              <div style="margin: 20px 0; text-align: center;">
+                <video 
+                  id="game1Video"
+                  width="100%" 
+                  height="400" 
+                  controls
+                  autoplay
+                  muted
+                  playsinline
+                  style="max-width: 600px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <source src="${this.assetUrl('game1.mp4')}" type="video/mp4">
+                  Your browser does not support the video tag.
+                </video>
               </div>
               <p style="font-size: 22px; margin-top: 30px;">Press <strong>space bar</strong> to begin.</p>
             </div>
@@ -1405,15 +2012,19 @@ export class TimelineManager {
             <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; text-align: center;">
               <h2 style="color: #333; margin-bottom: 30px; font-size: 36px;">Game 2</h2>
               <h3 style="color: #000; margin-bottom: 20px; font-size: 24px;">Great job!</h3>
-              <div style="background: #e8f5e8; border: 1px solid #c3e6cb; border-radius: 8px; padding: 28px; margin-bottom: 30px;">
-                <p style="font-size: 22px; color: #155724; margin-bottom: 15px; line-height: 1.6; text-align: left;">
-                  Now there will be several identical restaurants on the map.
-                </p>
-                <ul style="font-size: 22px; color: #155724; margin-bottom: 15px; line-height: 1.6; text-align: left; padding-left: 20px;">
-                  <li>Each round, you can <strong>win</strong> by getting to one of the restaurants.</li>
-                  <li>Note that some restaurants are already open when the round starts. Others may appear later.</li>
-                  <li>For each round that you win, you earn an additional 10 cents.</li>
-                </ul>
+              <div style="margin: 20px 0; text-align: center;">
+                <video 
+                  id="game2Video"
+                  width="100%" 
+                  height="400" 
+                  controls
+                  autoplay
+                  muted
+                  playsinline
+                  style="max-width: 600px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <source src="${this.assetUrl('game2.mp4')}" type="video/mp4">
+                  Your browser does not support the video tag.
+                </video>
               </div>
               <p style="font-size: 22px; margin-top: 30px;">Press <strong>space bar</strong> to begin.</p>
             </div>
@@ -1426,15 +2037,19 @@ export class TimelineManager {
             <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; text-align: center;">
               <h2 style="color: #333; margin-bottom: 30px; font-size: 36px;">Game 3</h2>
               <h3 style="color: #000; margin-bottom: 20px; font-size: 24px;">Well done!</h3>
-              <div style="background: #e8f5e8; border: 1px solid #c3e6cb; border-radius: 8px; padding: 28px; margin-bottom: 30px;">
-                <p style="font-size: 22px; color: #155724; margin-bottom: 15px; line-height: 1.6; text-align: left;">
-                  Let's continue. In this new game, you will collaborate with another player.
-                </p>
-                <ul style="font-size: 22px; color: #155724; margin-bottom: 15px; line-height: 1.6; text-align: left; padding-left: 20px;">
-                  <li>Each round, you can <strong> win </strong> if both of you go to the <strong> same </strong> restaurant.</li>
-                  <li>You lose the round if you end up at different restaurants.</li>
-                  <li>For each round that you win, you earn an additional 10 cents.</li>
-                </ul>
+              <div style="margin: 20px 0; text-align: center;">
+                <video 
+                  id="game3Video"
+                  width="100%" 
+                  height="400" 
+                  controls
+                  autoplay
+                  muted
+                  playsinline
+                  style="max-width: 600px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <source src="${this.assetUrl('game3.mp4')}" type="video/mp4">
+                  Your browser does not support the video tag.
+                </video>
               </div>
               <p style="font-size: 22px; margin-top: 30px;">Press <strong>space bar</strong> to begin.</p>
             </div>
@@ -1447,16 +2062,19 @@ export class TimelineManager {
             <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; text-align: center;">
               <h2 style="color: #333; margin-bottom: 30px; font-size: 36px;">Game 4</h2>
               <h3 style="color: #000; margin-bottom: 20px; font-size: 24px;">Good job!</h3>
-              <div style="background: #e8f5e8; border: 1px solid #c3e6cb; border-radius: 8px; padding: 28px; margin-bottom: 30px;">
-                <p style="font-size: 22px; color: #155724; margin-bottom: 15px; line-height: 1.6; text-align: left;">
-                  Now, let's start the final game! You will collaborate with the same player as before.
-                </p>
-                <ul style="font-size: 22px; color: #155724; margin-bottom: 15px; line-height: 1.6; text-align: left; padding-left: 20px;">
-                  <li>Each round, you can <strong> win </strong> if both of you go to the <strong> same </strong> restaurant.</li>
-                  <li>You lose the round if you end up at different restaurants.</li>
-                  <li> <strong> Note that some restaurants are already open when the round starts. Others may appear later.</strong></li>
-                  <li>For each round that you win, you earn an additional 10 cents.</li>
-                </ul>
+              <div style="margin: 20px 0; text-align: center;">
+                <video 
+                  id="game4Video"
+                  width="100%" 
+                  height="400" 
+                  controls
+                  autoplay
+                  muted
+                  playsinline
+                  style="max-width: 600px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  <source src="${this.assetUrl('video2.mp4')}" type="video/mp4">
+                  Your browser does not support the video tag.
+                </video>
               </div>
               <p style="font-size: 22px; margin-top: 30px;">Press <strong>space bar</strong> to begin.</p>
             </div>
