@@ -75,6 +75,5 @@ experiment-data-*.json.env.example
 
 # data files
 *.xlsx
-*.png
 *.csv
-*.png
+# PNGs in client/public/ are part of the app (questionnaire images); do not gitignore *.png globally

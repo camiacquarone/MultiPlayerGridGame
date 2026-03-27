@@ -159,21 +159,14 @@ export class TimelineManager {
           });
           this.hasShownPartnerFindingStage = true;
         } else {
-          console.log(`➕ Skipping waiting stage for ${experimentType}; adding match-play only`);
-          // Only add the match play gate for subsequent 2P experiments
-          // But first check if partner is still connected
+          console.log(`➕ Skipping waiting and match-play stages for ${experimentType}; checking partner presence only`);
+          // For subsequent 2P experiments (e.g., Game 4), do NOT show "Game is Ready" again.
+          // Only check if the partner is still connected before proceeding directly to trials.
           this.stages.push({
             type: 'check_partner_presence',
             experimentType: experimentType,
             experimentIndex: expIndex,
             handler: () => this.checkPartnerPresenceAndProceed(experimentType, expIndex)
-          });
-          this.stages.push({
-            type: 'match_play',
-            experimentType: experimentType,
-            experimentIndex: expIndex,
-            showPartnerFoundMessage: false,
-            handler: () => this.showMatchPlayStage(experimentType, expIndex)
           });
         }
       }
@@ -208,11 +201,11 @@ export class TimelineManager {
       handler: () => this.showEndExperimentInfoStage()
     });
 
-    // 10. Prolific redirect
-    this.stages.push({
-      type: 'prolific-redirect',
-      handler: () => this.showProlificRedirectStage()
-    });
+    // 10. Prolific redirect (DISABLED)
+    // this.stages.push({
+    //   type: 'prolific-redirect',
+    //   handler: () => this.showProlificRedirectStage()
+    // });
 
     console.log(`📋 Timeline created with ${this.stages.length} total stages`);
     console.log('📋 Stages:', this.stages.map((stage, index) => `${index}: ${stage.type}`).join(', '));
@@ -593,11 +586,7 @@ export class TimelineManager {
       `;
 
       // --- Audio: read the question aloud when this page loads ---
-      // We first try to play your custom audio files.
-      // If the browser blocks autoplay or the file is missing, we fall back to browser TTS.
-      const questionText = showError
-        ? 'Remember you are the red dot. Try again.'
-        : 'Which dot are you? Press on your dot to continue.';
+      // Use fixed custom recordings only (no TTS fallback).
       let currentAudio = null;
 
       const stopQuestionAudio = () => {
@@ -607,68 +596,33 @@ export class TimelineManager {
             currentAudio.currentTime = 0;
             currentAudio = null;
           }
-          if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-          }
         } catch (_) {
           // ignore
         }
       };
 
-      const playQuestionWithTTS = () => {
-        try {
-          const synth = window.speechSynthesis;
-          if (!synth) return;
-
-          const utterance = new SpeechSynthesisUtterance(questionText);
-          utterance.rate = 1.0;
-          utterance.pitch = 1.0;
-          utterance.volume = 1.0;
-          utterance.lang = 'en-US';
-
-          const voices = synth.getVoices();
-          const preferredVoice = voices.find(v =>
-            /en-US/i.test(v.lang) &&
-            (/natural|neural|premium|enhanced/i.test(v.name) ||
-             /samantha|alex|daniel|karen|moira|victoria/i.test(v.name))
-          ) || voices.find(v => /en-US/i.test(v.lang)) || voices[0];
-
-          if (preferredVoice) {
-            utterance.voice = preferredVoice;
-          }
-
-          synth.speak(utterance);
-        } catch (err) {
-          console.warn('Comprehension check TTS failed:', err);
-        }
-      };
-
       const playQuestionAudio = () => {
         if (showError) {
-          // For error message, use the Try again.mp3 audio file
+          // For error message, use tryAgain.mp3 from /public
           try {
-            const audio = new Audio(this.assetUrl('try-again.mp3'));
+            const audio = new Audio(this.assetUrl('tryAgain.mp3'));
             currentAudio = audio;
             audio.play().catch((err) => {
-              console.warn('Unable to autoplay Try again audio, falling back to TTS:', err);
-              playQuestionWithTTS();
+              console.warn('Unable to autoplay tryAgain audio:', err);
             });
           } catch (err) {
-            console.warn('Error starting Try again audio, falling back to TTS:', err);
-            playQuestionWithTTS();
+            console.warn('Error starting tryAgain audio:', err);
           }
         } else {
           try {
-            // Use the dedicated comprehension-check audio file from /public
-            const audio = new Audio(this.assetUrl('comprehension-check.mp3'));
+            // Use comprehensionCheck.mp3 from /public
+            const audio = new Audio(this.assetUrl('comprehensionCheck.mp3'));
             currentAudio = audio;
             audio.play().catch((err) => {
-              console.warn('Unable to autoplay comprehension audio, falling back to TTS:', err);
-              playQuestionWithTTS();
+              console.warn('Unable to autoplay comprehension audio:', err);
             });
           } catch (err) {
-            console.warn('Error starting comprehension audio, falling back to TTS:', err);
-            playQuestionWithTTS();
+            console.warn('Error starting comprehension audio:', err);
           }
         }
       };
@@ -769,12 +723,6 @@ export class TimelineManager {
           <p style="font-size: 14px; color: #999; margin-bottom: 15px;">
             This may take a few moments.
           </p>
-
-          <div style="background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 8px; padding: 15px; margin-top: 20px;">
-            <p style="font-size: 14px; color: #0c5460; margin: 0; font-weight: 500;">
-              💰 Your waiting time (if it exceeds 5 minutes) will be compensated ($0.5 per minute). Thank you for your patience!
-            </p>
-          </div>
 
 
         </div>
@@ -1315,34 +1263,22 @@ export class TimelineManager {
           name: 'ai_detection',
           title: 'Page 1 of 3',
           prompt: 'Do you think the other player is a person or a computer?',
-          options: [
-            'good',
-            'bad'
-          ]
+          options: ['Person', 'Computer'],
+          optionImages: ['person.png', 'computer.png']
         },
         {
           name: 'collaboration_rating',
           title: 'Page 2 of 3',
           prompt: 'How well did the other player collaborate with you?',
-          options: [
-            'Very poor collaborator',
-            'Poor collaborator',
-            'Neutral',
-            'Good collaborator',
-            'Very good collaborator'
-          ]
+          options: ['Good collaborator', 'Bad collaborator'],
+          optionImages: ['good.png', 'bad.png']
         },
         {
           name: 'play_again',
           title: 'Page 3 of 3',
           prompt: 'Would you like to play this game again in the future?',
-          options: [
-            'Definitely not play again',
-            'Probably not play again',
-            'Not sure',
-            'Probably play again',
-            'Definitely play again'
-          ]
+          options: ['Yes', 'No'],
+          optionImages: ['yes.png', 'no.png']
         }
       ];
 
@@ -1352,35 +1288,24 @@ export class TimelineManager {
       // Default to index 0 so pressing Space before clicking is safe.
       let selIndex = 0;
 
-      // Audio playback functionality with custom recordings support
-      let currentUtterance = null;
+      // Questionnaire audio: only question1.mp3–question3.mp3 for each page prompt (no TTS for options).
       let currentAudio = null;
       const synth = window.speechSynthesis || null;
-      const useCustomAudio = CONFIG?.tts?.useCustomAudio !== false;
-      const customAudioPath = CONFIG?.tts?.customAudioPath || '/audio/questionnaire/';
-      const useOpenAI = CONFIG?.tts?.useOpenAI !== false;
-      const ttsServerUrl = CONFIG?.tts?.ttsServerUrl || window.location.origin;
-      const openAIVoice = CONFIG?.tts?.openAIVoice || 'nova';
 
-      // Map questions and options to audio file paths
-      const getAudioFilePath = (questionIndex, text, isPrompt = false, optionIndex = -1) => {
-        const qNum = questionIndex + 1; // 1-indexed for file names
+      const playPromptAudio = async (interrupt = true) => {
+        const qNum = qIndex + 1;
+        const audioPath = this.assetUrl(`question${qNum}.mp3`);
 
-        if (isPrompt) {
-          return this.assetUrl(`question${qNum}.mp3`);
+        if (interrupt) {
+          if (synth) synth.cancel();
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            currentAudio = null;
+          }
         }
 
-        if (text) {
-          return this.assetUrl(`${text}.mp3`);
-        }
-
-        const fileName = `q${qNum}_option${optionIndex}.mp3`;
-        return `${customAudioPath}${fileName}`;
-      };
-
-      // Play custom audio file
-      const playCustomAudio = async (audioPath) => {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           const audio = new Audio(audioPath);
           audio.onloadeddata = () => {
             currentAudio = audio;
@@ -1392,212 +1317,48 @@ export class TimelineManager {
                 };
                 audio.onerror = () => {
                   currentAudio = null;
-                  reject(new Error('Audio playback failed'));
+                  console.warn('Questionnaire prompt audio playback failed:', audioPath);
+                  resolve();
                 };
               })
-              .catch(reject);
+              .catch(() => resolve());
           };
-
           audio.onerror = () => {
-            reject(new Error('Audio file not found'));
+            console.warn('Questionnaire prompt audio missing or failed to load:', audioPath);
+            resolve();
           };
-
           audio.load();
         });
       };
 
-      const speakWithBrowserTTS = (text) => {
-        if (!synth) return Promise.resolve(); // Browser doesn't support TTS
-
-        return new Promise((resolve, reject) => {
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.rate = 1.0;
-          utterance.pitch = 1.0;
-          utterance.volume = 1.0;
-          utterance.lang = 'en-US';
-
-          // Try to use a natural-sounding voice
-          const voices = synth.getVoices();
-          const preferredVoice = voices.find(v =>
-            /en-US/i.test(v.lang) &&
-            (/natural|neural|premium|enhanced/i.test(v.name) ||
-              /samantha|alex|daniel|karen|moira|victoria/i.test(v.name))
-          ) || voices.find(v => /en-US/i.test(v.lang)) || voices[0];
-
-          if (preferredVoice) {
-            utterance.voice = preferredVoice;
-          }
-
-          currentUtterance = utterance;
-
-          utterance.onend = () => {
-            currentUtterance = null;
-            resolve();
-          };
-
-          utterance.onerror = (error) => {
-            currentUtterance = null;
-            reject(error);
-          };
-
-          synth.speak(utterance);
-        });
-      };
-
-      const speak = async (text, interrupt = true, isPrompt = false, optionIndex = -1) => {
-        if (!text) return Promise.resolve();
-
-        // Stop any ongoing speech
-        if (interrupt) {
-          if (currentUtterance && synth) {
-            synth.cancel();
-          }
-          if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-            currentAudio = null;
-          }
-        }
-
-        // Try custom audio first if enabled
-        if (useCustomAudio) {
-          const audioPath = getAudioFilePath(qIndex, text, isPrompt, optionIndex);
-
-          const pathsToTry = [];
-          if (!isPrompt && text) {
-            pathsToTry.push(this.assetUrl(`${text}.mp3`));
-            pathsToTry.push(this.assetUrl(`${text.charAt(0).toUpperCase() + text.slice(1)}.mp3`));
-            const qNum = qIndex + 1;
-            pathsToTry.push(`${customAudioPath}q${qNum}_option${optionIndex}.mp3`);
-          } else {
-            pathsToTry.push(audioPath);
-          }
-
-          for (const path of pathsToTry) {
-            try {
-              await playCustomAudio(path);
-              return Promise.resolve();
-            } catch (_) {
-              continue;
-            }
-          }
-
-          console.log(`Custom audio not found for any of: ${pathsToTry.join(', ')}, using TTS fallback`);
-        }
-
-        // Try OpenAI TTS if enabled
-        if (useOpenAI) {
-          try {
-            const response = await fetch(`${ttsServerUrl}/api/tts/speak`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                text: text,
-                voice: openAIVoice
-              })
-            });
-
-            if (response.ok) {
-              const audioBlob = await response.blob();
-              const audioUrl = URL.createObjectURL(audioBlob);
-              const audio = new Audio(audioUrl);
-
-              currentAudio = audio;
-
-              return new Promise((resolve, reject) => {
-                audio.onended = () => {
-                  URL.revokeObjectURL(audioUrl);
-                  currentAudio = null;
-                  resolve();
-                };
-
-                audio.onerror = () => {
-                  URL.revokeObjectURL(audioUrl);
-                  currentAudio = null;
-                  speakWithBrowserTTS(text).then(resolve).catch(reject);
-                };
-
-                audio.play().catch(reject);
-              });
-            }
-
-            console.warn('OpenAI TTS API error, falling back to browser TTS');
-            return speakWithBrowserTTS(text);
-          } catch (error) {
-            console.warn('OpenAI TTS failed, falling back to browser TTS:', error);
-            return speakWithBrowserTTS(text);
-          }
-        }
-
-        return speakWithBrowserTTS(text);
-      };
-
-      // Load voices if needed (some browsers need this)
-      if (synth && synth.getVoices().length === 0) {
-        synth.onvoiceschanged = () => {
-          // Voices loaded
-        };
-      }
-
       const renderQuestion = (shouldSpeakPrompt = false) => {
         const q = questions[qIndex];
-        const isImageQuestion = q.name === 'ai_detection';
+        const images = q.optionImages || [];
 
-        let optionsHtml;
-        if (isImageQuestion) {
-          // Don't depend on /good.png and /bad.png being present.
-          // We render simple colored faces instead.
-          const faceColors = ['#22c55e', '#ef4444']; // good green, bad red
-          optionsHtml = q.options.map((opt, idx) => {
-            const isSelected = idx === selIndex;
-            const borderColor = isSelected ? '#4f46e5' : '#e5e7eb';
-            const bgColor = isSelected ? '#eef2ff' : '#ffffff';
-            const faceBg = faceColors[idx] || '#ef4444';
-            const faceChar = idx === 0 ? 'P' : 'C';
-            return `
-              <button class="image-option" data-idx="${idx}" style="
-                padding: 12px 16px;
-                margin: 8px 12px;
-                border-radius: 16px;
-                border: 3px solid ${borderColor};
-                background: ${bgColor};
-                cursor: pointer;
-                display: inline-flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-              ">
-                <div style="
-                  width:140px; height:140px;
-                  border-radius:50%;
-                  background:${faceBg};
-                  display:flex;
-                  align-items:center;
-                  justify-content:center;
-                  font-size:64px;
-                  color:#ffffff;
-                  font-weight:800;
-                  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
-                ">${faceChar}</div>
-              </button>`;
-          }).join('');
-        } else {
-          optionsHtml = q.options.map((opt, idx) => {
-            const isSelected = idx === selIndex;
-            return `
-              <div data-idx="${idx}" style="
-                padding: 12px 16px;
-                margin: 8px 0;
-                border-radius: 10px;
-                border: 2px solid ${isSelected ? '#4f46e5' : '#e5e7eb'};
-                background: ${isSelected ? '#eef2ff' : '#ffffff'};
-                color: #333;
-                font-size: 18px;
-                text-align: center;
-              ">${opt}</div>`;
-          }).join('');
-        }
+        const optionsHtml = q.options.map((opt, idx) => {
+          const isSelected = idx === selIndex;
+          const borderColor = isSelected ? '#4f46e5' : '#e5e7eb';
+          const bgColor = isSelected ? '#eef2ff' : '#ffffff';
+          const src = images[idx] ? this.assetUrl(images[idx]) : '';
+          return `
+            <button type="button" class="image-option" data-idx="${idx}" aria-label="${opt.replace(/"/g, '&quot;')}" style="
+              padding: 12px 16px;
+              margin: 8px 12px;
+              border-radius: 16px;
+              border: 3px solid ${borderColor};
+              background: ${bgColor};
+              cursor: pointer;
+              display: inline-flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            ">
+              ${src
+                ? `<img src="${src}" alt="" style="max-width: min(200px, 38vw); max-height: 180px; height: auto; display: block; object-fit: contain;" />`
+                : `<span style="font-size: 18px; color: #333;">${opt}</span>`}
+            </button>`;
+        }).join('');
 
         this.container.innerHTML = `
           <div style="display:flex; align-items:center; justify-content:center; min-height:100vh; background:#f8f9fa; padding:20px;">
@@ -1606,58 +1367,42 @@ export class TimelineManager {
               <div style="text-align:center; margin-bottom:8px; color:#6b7280; font-weight:600;">${q.title}</div>
               <h2 style="text-align:center; margin:8px 0 20px; color:#111827;">${q.prompt}</h2>
               <div style="margin-bottom:16px; text-align:center; color:#6b7280;">
-                ${isImageQuestion
-                  ? 'Click a face to answer (or use ↑ ↓ and Space).'
-                  : 'Use ↑ ↓ to choose, press Space to confirm'}
+                Click an image to answer (or use ↑ ↓ and Space).
               </div>
-              <div id="options" style="display:flex; flex-direction:${isImageQuestion ? 'row' : 'column'}; justify-content:center;">${optionsHtml}</div>
+              <div id="options" style="display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center; align-items:center;">${optionsHtml}</div>
             </div>
           </div>`;
 
-        const selectedOption = q.options[selIndex];
         if (shouldSpeakPrompt) {
-          speak(q.prompt, true, true, -1).then(() => {
-            setTimeout(() => {
-              speak(selectedOption, false, false, selIndex);
-            }, 300);
-          }).catch(() => {
-            setTimeout(() => {
-              speak(selectedOption, false, false, selIndex);
-            }, 300);
-          });
-        } else {
-          speak(selectedOption, true, false, selIndex);
+          playPromptAudio(true);
         }
 
-        // Mouse/touch support for the first question
-        if (isImageQuestion) {
-          const buttons = this.container.querySelectorAll('.image-option');
-          buttons.forEach((btn) => {
-            btn.addEventListener('click', () => {
-              const idx = Number(btn.getAttribute('data-idx') || '0');
-              selIndex = idx;
-              answers[q.name] = q.options[selIndex];
+        const buttons = this.container.querySelectorAll('.image-option');
+        buttons.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number(btn.getAttribute('data-idx') || '0');
+            selIndex = idx;
+            answers[q.name] = q.options[selIndex];
 
-              if (synth) synth.cancel();
-              if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-              }
+            if (synth) synth.cancel();
+            if (currentAudio) {
+              currentAudio.pause();
+              currentAudio.currentTime = 0;
+              currentAudio = null;
+            }
 
-              if (qIndex < questions.length - 1) {
-                qIndex += 1;
-                selIndex = 2;
-                renderQuestion(true);
-              } else {
-                document.removeEventListener('keydown', handleKeys);
-                this.experimentData.questionnaire = answers;
-                console.log('📝 Questionnaire completed');
-                this.nextStage();
-              }
-            });
+            if (qIndex < questions.length - 1) {
+              qIndex += 1;
+              selIndex = 0;
+              renderQuestion(true);
+            } else {
+              document.removeEventListener('keydown', handleKeys);
+              this.experimentData.questionnaire = answers;
+              console.log('📝 Questionnaire completed');
+              this.nextStage();
+            }
           });
-        }
+        });
       };
 
       const handleKeys = (e) => {
@@ -1683,7 +1428,7 @@ export class TimelineManager {
 
           if (qIndex < questions.length - 1) {
             qIndex += 1;
-            selIndex = 2;
+            selIndex = 0;
             renderQuestion(true);
           } else {
             document.removeEventListener('keydown', handleKeys);
@@ -1801,6 +1546,15 @@ export class TimelineManager {
 
   showEndExperimentInfoStage() {
     const completionCode = this.generateCompletionCode();
+    const notifyLookitDone = () => {
+      if (this._lookitDonePosted) return;
+      this._lookitDonePosted = true;
+      try {
+        window.parent.postMessage({ type: 'exp-lookit:next' }, '*');
+      } catch (err) {
+        console.warn('Unable to post exp-lookit:next message:', err);
+      }
+    };
 
     this.container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
@@ -1811,9 +1565,11 @@ export class TimelineManager {
             Thank you for participating in our study!
           </p>
 
+          <!--
           <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ffeeba; color: #856404;">
             We are saving your data now. Your completion code will be shown after your data has been saved successfully.
           </div>
+          -->
 
           <div style="margin-bottom: 30px;">
             <div id="saving-status" style="display: inline-block; margin: 10px; color: #666;">📊 Saving your data...</div>
@@ -1878,6 +1634,7 @@ export class TimelineManager {
       }
       // Remove handler and move to next stage automatically
       this.off('data-save-success', handleSaved);
+      notifyLookitDone();
       this.nextStage();
     };
     // Ensure single listener
@@ -1890,6 +1647,7 @@ export class TimelineManager {
         console.log('⏳ Waiting for data-save success before continuing');
         return;
       }
+      notifyLookitDone();
       this.nextStage();
     });
   }
@@ -1974,7 +1732,7 @@ export class TimelineManager {
   }
 
   assetUrl(path) {
-    const base = (import.meta?.env?.BASE_URL) || '/';
+    const base = import.meta.env.BASE_URL || '/';
     const normalizedPath = String(path || '').replace(/^\/+/, '');
     return `${base}${normalizedPath}`;
   }
@@ -2305,3 +2063,4 @@ export class TimelineManager {
     console.log('📊 [WAITING] Recorded waiting time:', waitingDurationSeconds + 's (total: ' + this.experimentData.waitingDuration + 's)');
   }
 }
+// cache bust Thu Mar 26 15:55:13 EDT 2026
