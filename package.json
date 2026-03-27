@@ -8,6 +8,7 @@
     "server:dev": "nodemon server/index.js",
     "client:dev": "vite",
     "build": "vite build",
+    "deploy": "npm run build && gh-pages -d dist -b gh-pages -f",
     "preview": "vite preview",
     "start": "node server/index.js",
     "render-build": "npm install && vite build"
