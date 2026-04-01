@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+// Production: GitHub Pages subpath. Development: '/' so /game1.mp4 etc. load on localhost.
+export default defineConfig(({ mode }) => ({
   root: 'client',
-  base: '/MultiPlayerGridGame/',
-  publicDir: 'public', 
+  base: mode === 'production' ? '/MultiPlayerGridGame/' : '/',
+  publicDir: 'public',
   build: {
     outDir: '../dist',
     emptyOutDir: true,
@@ -11,4 +12,4 @@ export default defineConfig({
   server: {
     port: 3000,
   },
-});
+}));
