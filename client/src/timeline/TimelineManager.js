@@ -1036,12 +1036,14 @@ export class TimelineManager {
       playerColor = this.playerIndex === 0 ? CONFIG.visual.colors.player1 : CONFIG.visual.colors.player2;
       playerName = this.playerIndex === 0 ? 'Player 1 (Red)' : 'Player 2 (Orange)';
     }
+    const totalRounds = CONFIG?.game?.experiments?.numTrials?.[experimentType] || 1;
 
     // Create trial container with game canvas area
     this.container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
         <div style="text-align: center; max-width: 800px; width: 100%;">
           <h3 style="margin-bottom: 20px;">Game ${experimentIndex + 1}</h3>
+          <h4 style="margin: -8px 0 16px 0; color: #4b5563;">Round ${trialIndex + 1}/${totalRounds}</h4>
           <div id="game-canvas-container" style="margin: 0 auto; position: relative; display: flex; justify-content: center;">
             <!-- Game canvas will be inserted here by ExperimentManager -->
           </div>
@@ -1079,6 +1081,7 @@ export class TimelineManager {
     // Get the last trial result
     const trialResult = this.experimentData.experiments[experimentType]?.[trialIndex];
     const success = trialResult?.success || false;
+    const totalRounds = CONFIG?.game?.experiments?.numTrials?.[experimentType] || 1;
 
     // Instead of creating a new page, show feedback as overlay on the current game canvas
     // Find the existing game canvas container
@@ -1098,7 +1101,7 @@ export class TimelineManager {
         <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
           <div style="text-align: center; max-width: 600px; width: 100%;">
             <h3 style="margin-bottom: 10px;">Game ${experimentIndex + 1}</h3>
-            <h4 style="margin-bottom: 20px;">Round ${trialIndex + 1} Results</h4>
+            <h4 style="margin-bottom: 20px;">Round ${trialIndex + 1}/${totalRounds} Results</h4>
             <div id="feedbackCanvasContainer" style="margin: 0 auto 20px auto; position: relative; display: flex; justify-content: center;"></div>
           </div>
         </div>
