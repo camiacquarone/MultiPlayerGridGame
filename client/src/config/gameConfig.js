@@ -15,6 +15,38 @@ const defaultServerUrl = (typeof window !== 'undefined' && window.location && wi
   ? window.location.origin
   : 'http://localhost:3001';
 
+/** sessionStorage key: one random joint vs individual assignment per browser tab/session */
+const RL_ASSIGNMENT_SESSION_KEY = 'gridworld.rlStudyCondition';
+
+const pickRandomJointOrIndividual = () => (Math.random() < 0.5 ? 'joint' : 'individual');
+
+/**
+ * Each new participant session (new tab) gets a 50/50 joint vs individual assignment.
+ * Reuses the same assignment if they refresh (sessionStorage). Optional URL ?ai= still overrides via GameApplication + setPlayerType.
+ * Set VITE_STUDY_RL_CONDITION=joint or =individual to force (e.g. QA builds).
+ */
+const resolveParticipantRLCondition = () => {
+  const forced = String(getEnvVar('VITE_STUDY_RL_CONDITION', '') || '').toLowerCase();
+  if (forced === 'joint' || forced === 'individual') return forced;
+
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      const prev = sessionStorage.getItem(RL_ASSIGNMENT_SESSION_KEY);
+      if (prev === 'joint' || prev === 'individual') return prev;
+      const chosen = pickRandomJointOrIndividual();
+      sessionStorage.setItem(RL_ASSIGNMENT_SESSION_KEY, chosen);
+      return chosen;
+    }
+  } catch (_) {
+    // private mode / blocked storage — fall through to one-shot random
+  }
+  return pickRandomJointOrIndividual();
+};
+
+const participantRLCondition = resolveParticipantRLCondition();
+const assignedRLPartnerType = participantRLCondition === 'joint' ? 'rl_joint' : 'rl_individual';
+const assignedAgentMode = participantRLCondition === 'joint' ? 'joint' : 'individual';
+
 export const CONFIG = {
   // Debug / logging configuration
   debug: {
@@ -46,6 +78,8 @@ export const CONFIG = {
     prolificCompletionCode: getEnvVar('VITE_PROLIFIC_COMPLETION_CODE', 'CTNDR8GV'),
     matrixSize: 15,
     maxGameLength: 60,
+    /** 'joint' | 'individual' — RL study arm for this participant (random once per tab; see resolveParticipantRLCondition) */
+    studyRLCondition: participantRLCondition,
 
     // Player configuration
     players: {
@@ -57,8 +91,8 @@ export const CONFIG = {
       player2: {
         // Types: 'human' | 'gpt' | 'rl_individual' | 'rl_joint'
         // Legacy alias 'ai' is treated as 'rl_joint'
-        type: 'gpt',
-          color: 'purple',
+        type: assignedRLPartnerType,
+        color: 'purple',
         description: 'Human, GPT, or RL partner'
       }
     },
@@ -73,10 +107,10 @@ export const CONFIG = {
       order: ['1P1G', '1P2G', '2P2G', '2P3G'], // Full experiment order
 
       numTrials: {
-        '1P1G': 1, // 3
-        '1P2G': 1, // 12
-        '2P2G': 1, // 8
-        '2P3G': 1, // 12
+        '1P1G': 2, // 2
+        '1P2G': 8, // 8
+        '2P2G': 4, // 4
+        '2P3G': 8, // 8
       }
     },
 
@@ -107,7 +141,7 @@ export const CONFIG = {
     // AI agent settings
     agent: {
       // RL mode for player2 when using RL: 'individual' or 'joint'
-      type: 'joint',
+      type: assignedAgentMode,
       delay: 500,
       independentDelay: 300,
       // When true, AI/GPT moves are synchronized with the human input
@@ -220,7 +254,7 @@ export const CONFIG = {
     matchPlayReadyTimeout: 10000,
     // Fallback AI partner type when human-human matching fails
     // Allowed: 'gpt' | 'rl_individual' | 'rl_joint'
-    fallbackAIType: 'gpt',
+    fallbackAIType: assignedRLPartnerType,
     // Partner inactivity settings
     inactivityFallback: {
       // Enable automatic fallback to AI when partner is inactive
@@ -292,8 +326,14 @@ export const GameConfigUtils = {
 
     // Keep RL agent mode consistent when setting player2 to RL types
     if (playerIndex === 2) {
-      if (normalized === 'rl_joint') CONFIG.game.agent.type = 'joint';
-      if (normalized === 'rl_individual') CONFIG.game.agent.type = 'individual';
+      if (normalized === 'rl_joint') {
+        CONFIG.game.agent.type = 'joint';
+        CONFIG.game.studyRLCondition = 'joint';
+      }
+      if (normalized === 'rl_individual') {
+        CONFIG.game.agent.type = 'individual';
+        CONFIG.game.studyRLCondition = 'individual';
+      }
     }
   },
 

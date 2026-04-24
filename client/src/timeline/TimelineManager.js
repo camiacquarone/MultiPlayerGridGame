@@ -1738,12 +1738,16 @@ export class TimelineManager {
   }
 
   getInstructionsForExperiment(experimentType) {
+    // Debug cue: joint → red title, individual → blue (see CONFIG.game.studyRLCondition)
+    const game1TitleColor =
+      CONFIG?.game?.studyRLCondition === 'individual' ? '#2563eb' : '#dc2626';
+
     const instructions = {
       '1P1G': {
         html: `
           <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f8f9fa;">
             <div style="background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 800px; text-align: center;">
-              <h2 style="color: #333; margin-bottom: 30px; font-size: 36px;">Game 1</h2>
+              <h2 style="color: ${game1TitleColor}; margin-bottom: 30px; font-size: 36px;">Game 1</h2>
               <h3 style="color: #000; margin-bottom: 20px; font-size: 24px;">Before we begin, let's practice a few rounds!</h3>
               <div style="margin: 20px 0; text-align: center;">
                 <video 
